@@ -11,6 +11,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@clack/prompts": "^1.4.0",
     "vdf-parser": "^1.2.1"
   }
 }

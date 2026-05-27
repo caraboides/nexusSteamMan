@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import vdf from "vdf-parser";
 import os from "node:os";
+import { select, isCancel, cancel, intro, outro } from "@clack/prompts";
 
 const STEAM_PATH = `${os.homedir()}/.steam/steam`;
 
@@ -17,13 +20,9 @@ async function getInstalledGames(): Promise<Game[]> {
     const content = await readFile(libPath, "utf-8");
     const data = vdf.parse(content);
 
-    
-    console.dir(data)
-
-    // libraryfolders.vdf hat eine Struktur, die wir flachklopfen müssen
     const libraries = Object.values(data.libraryfolders);
-    
-    console.dir(libraries)
+
+    const installDirs: string[] = libraries.map((lib: any) => lib.path);
 
     const installedAppIds = libraries.flatMap((lib: any) => 
         Object.keys(lib.apps || {})
@@ -31,10 +30,11 @@ async function getInstalledGames(): Promise<Game[]> {
 
     return Promise.all(installedAppIds.map( async id => {
         const p = await checkProton(id)
+        const name = await getGameName(id, installDirs)
         return {
             appId: id,
-            name: "test",
-            protonConfig:  p
+            name,
+            protonConfig: p
         }
     }));
 }
@@ -53,6 +53,38 @@ async function checkProton(appId: string): Promise<ProtonConfig> {
     return { appId, mode: "Native/Default" };
 }
 
-const games = await getInstalledGames()
+async function getGameName(appId: string, installDirs: string[]): Promise<string> {
+    for (const dir of installDirs) {
+        const manifestPath = path.join(dir, "steamapps", `appmanifest_${appId}.acf`);
+        if (existsSync(manifestPath)) {
+            const content = await readFile(manifestPath, "utf-8");
+            const data: any = vdf.parse(content);
+            return data.AppState?.name || appId;
+        }
+    }
+    return appId;
+}
 
-console.log(games)
+async function main() {
+    intro("NexusSteamMan")
+
+    const games = await getInstalledGames()
+
+    const selected = await select({
+        message: "Für welches Spiel sollen Nexus Mods installiert werden?",
+        options: games.map(g => ({
+            value: g,
+            label: g.name as string,
+            hint: g.appId as string,
+        })),
+    })
+
+    if (isCancel(selected)) {
+        cancel("Vorgang abgebrochen")
+        process.exit(0)
+    }
+
+    outro(`Ausgewählt: ${selected.name} (${selected.appId})`)
+}
+
+await main()
