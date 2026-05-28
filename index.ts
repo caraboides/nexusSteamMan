@@ -1,5 +1,5 @@
 import { select, confirm, isCancel, cancel, intro, outro } from "@clack/prompts";
-import { getInstalledGames, isSteamInstalled, isSteamRunning } from "./steam-helper";
+import { getInstalledGames, getAccountId, isSteamInstalled, isSteamRunning } from "./steam-helper";
 import { info } from "console";
 
 async function main() {
@@ -14,7 +14,14 @@ async function main() {
         process.exit(0)
     }
 
-    info("Scanning for installed games...")
+    const accountId = await getAccountId();
+
+    if (!accountId) {
+        outro("No Steam user found. Please log in to Steam and try again.")
+        process.exit(0)
+    }
+
+    info("Scanning for installed games... for user " + accountId)
     const games = (await getInstalledGames()).filter(g => g.protonConfig.mode === "Proton");
     if (games.length === 0) {
         outro("No proton games found. Please install at least one game with proton and try again.")
