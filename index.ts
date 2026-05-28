@@ -1,77 +1,28 @@
-import { readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import path from "node:path";
-import vdf from "vdf-parser";
-import os from "node:os";
-import { select, isCancel, cancel, intro, outro } from "@clack/prompts";
-
-const STEAM_PATH = `${os.homedir()}/.steam/steam`;
-
-type ProtonConfig = {appId: string, mode: string, tool?: string}
-
-type Game = {
-    appId: String
-    name: String
-    protonConfig: ProtonConfig
-}
-
-async function getInstalledGames(): Promise<Game[]> {
-    const libPath = `${STEAM_PATH}/steamapps/libraryfolders.vdf`;
-    const content = await readFile(libPath, "utf-8");
-    const data = vdf.parse(content);
-
-    const libraries = Object.values(data.libraryfolders);
-
-    const installDirs: string[] = libraries.map((lib: any) => lib.path);
-
-    const installedAppIds = libraries.flatMap((lib: any) => 
-        Object.keys(lib.apps || {})
-    );
-
-    return Promise.all(installedAppIds.map( async id => {
-        const p = await checkProton(id)
-        const name = await getGameName(id, installDirs)
-        return {
-            appId: id,
-            name,
-            protonConfig: p
-        }
-    }));
-}
-
-// Um zu prüfen, ob es Nativ oder Proton ist:
-async function checkProton(appId: string): Promise<ProtonConfig> {
-    const configPath = `${STEAM_PATH}/config/config.vdf`;
-    const content = await readFile(configPath, "utf-8");
-    const data: any = vdf.parse(content);
-
-    const mapping = data.InstallConfigStore.Software.Valve.Steam.CompatToolMapping;
-    
-    if (mapping && mapping[appId]) {
-        return { appId, mode: "Proton", tool: mapping[appId].name };
-    }
-    return { appId, mode: "Native/Default" };
-}
-
-async function getGameName(appId: string, installDirs: string[]): Promise<string> {
-    for (const dir of installDirs) {
-        const manifestPath = path.join(dir, "steamapps", `appmanifest_${appId}.acf`);
-        if (existsSync(manifestPath)) {
-            const content = await readFile(manifestPath, "utf-8");
-            const data: any = vdf.parse(content);
-            return data.AppState?.name || appId;
-        }
-    }
-    return appId;
-}
+import { select, confirm, isCancel, cancel, intro, outro } from "@clack/prompts";
+import { getInstalledGames, isSteamInstalled, isSteamRunning } from "./steam-helper";
+import { info } from "console";
 
 async function main() {
-    intro("NexusSteamMan")
+    intro("Add Nexus Mods to your Steam proton games")
+    if (!isSteamInstalled()) {
+        outro("Steam is not installed. Please install Steam and try again.")
+        process.exit(0)
+    }
 
-    const games = await getInstalledGames()
+    if (isSteamRunning()) {
+        outro("Steam is running. Please close Steam and try again.")
+        process.exit(0)
+    }
+
+    info("Scanning for installed games...")
+    const games = (await getInstalledGames()).filter(g => g.protonConfig.mode === "Proton");
+    if (games.length === 0) {
+        outro("No proton games found. Please install at least one game with proton and try again.")
+        process.exit(0)
+    }
 
     const selected = await select({
-        message: "Für welches Spiel sollen Nexus Mods installiert werden?",
+        message: "For which game do you want to add Nexus Mods support?",
         options: games.map(g => ({
             value: g,
             label: g.name as string,
@@ -82,6 +33,17 @@ async function main() {
     if (isCancel(selected)) {
         cancel("Vorgang abgebrochen")
         process.exit(0)
+    }
+
+    const shouldProceed = await confirm({
+        message: 'Do you want to add Nexus Mods support to this game?',
+    });
+
+    if (isCancel(shouldProceed) || !shouldProceed) {
+        console.log('Operation cancelled');
+        process.exit(0);
+    } else {
+        console.log('Proceeding...');
     }
 
     outro(`Ausgewählt: ${selected.name} (${selected.appId})`)
