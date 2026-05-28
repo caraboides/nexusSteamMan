@@ -22,7 +22,7 @@ async function main() {
     }
 
     info("Scanning for installed games... for user " + accountId)
-    const games = (await getInstalledGames()).filter(g => g.protonConfig.mode === "Proton");
+    const games = (await getInstalledGames(accountId)).filter(g => g.protonConfig.mode === "Proton");
     if (games.length === 0) {
         outro("No proton games found. Please install at least one game with proton and try again.")
         process.exit(0)

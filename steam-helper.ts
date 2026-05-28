@@ -4,6 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
 import vdf from "vdf-parser";
 import path from "node:path";
 import type { Game, ProtonConfig } from "./model";
+import { writeFileSync } from 'fs';
+import { parseBuffer, parseFile, writeBuffer, writeFile } from 'steam-shortcut-editor';
 const STEAM_PATH = `${os.homedir()}/.steam/steam`;
 
 export function isSteamInstalled(): boolean {
@@ -26,7 +28,7 @@ export function isSteamRunning(): boolean {
     }
 }
 
-export async function getInstalledGames(): Promise<Game[]> {
+export async function getInstalledGames(accountId: string): Promise<Game[]> {
     const libPath = `${STEAM_PATH}/steamapps/libraryfolders.vdf`;
     const content = await readFile(libPath, "utf-8");
     const data = vdf.parse(content);
@@ -44,6 +46,7 @@ export async function getInstalledGames(): Promise<Game[]> {
         const name = await getGameName(id, installDirs)
         return {
             appId: id,
+            accountId,
             name,
             protonConfig: p
         }
@@ -93,8 +96,9 @@ async function getGameName(appId: string, installDirs: string[]): Promise<string
 }
 
 export async function addNexusSupport(game: Game): Promise<void> {
+    const shortcutPath = `${STEAM_PATH}/userdata/${game.accountId}/config/shortcuts.vdf`;
     const nexusEntry = {
-        appname: "Nexus Mod Manager",
+        appname: "Nexus Mod Manager for " + game.name,
         exe: "\"/path/to/vortex.exe\"",
         StartDir: "\"/path/to/dir/\"",
         icon: "",
@@ -108,4 +112,9 @@ export async function addNexusSupport(game: Game): Promise<void> {
         LastPlayTime: 0,
         tags: ["Tools"]
     }
+    // Laden, Hinzufügen und Speichern (Binary VDF)
+    const buffer = readFileSync(shortcutPath);
+    let shortcuts = parseBuffer(buffer);
+    shortcuts.push(nexusEntry);
+    writeFileSync(shortcutPath, writeBuffer(shortcuts));
 }
