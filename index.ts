@@ -1,18 +1,18 @@
 import { select, confirm, isCancel, cancel, intro, outro } from "@clack/prompts";
-import { getInstalledGames, getAccountId, isSteamInstalled, isSteamRunning } from "./steam-helper";
+import { getInstalledGames, getAccountId, isSteamInstalled, isSteamRunning, addNexusSupport } from "./steam-helper";
 import { info } from "console";
 
 async function main() {
     intro("Add Nexus Mods to your Steam proton games")
-    if (!isSteamInstalled()) {
-        outro("Steam is not installed. Please install Steam and try again.")
-        process.exit(0)
-    }
+    // if (!isSteamInstalled()) {
+    //     outro("Steam is not installed. Please install Steam and try again.")
+    //     process.exit(0)
+    // }
 
-    if (isSteamRunning()) {
-        outro("Steam is running. Please close Steam and try again.")
-        process.exit(0)
-    }
+    // if (isSteamRunning()) {
+    //     outro("Steam is running. Please close Steam and try again.")
+    //     process.exit(0)
+    // }
 
     const accountId = await getAccountId();
 
@@ -51,6 +51,7 @@ async function main() {
         process.exit(0);
     } else {
         console.log('Proceeding...');
+        await addNexusSupport(selected);
     }
 
     outro(`Ausgewählt: ${selected.name} (${selected.appId})`)
