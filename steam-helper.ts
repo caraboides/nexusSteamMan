@@ -5,13 +5,13 @@ import vdf from "vdf-parser";
 import path from "node:path";
 import type { Game, ProtonConfig } from "./model";
 import { parseBuffer, parseFile, writeBuffer, writeFile } from 'steam-shortcut-editor';
-import { intro, outro, spinner, cancel } from '@clack/prompts';
+import { intro, outro, spinner, cancel, log } from '@clack/prompts';
 import { createWriteStream } from 'node:fs';
 import { join } from 'node:path';
 
 import { tmpdir } from 'node:os';
 import SevenZip from "7z-wasm";
-import { mkdir } from "node:fs/promises";
+import { mkdir, symlink } from "node:fs/promises";
 import { resolve, dirname, basename } from "node:path";
 import crc32 from 'crc-32';
 
@@ -197,7 +197,7 @@ async function extractAndCapture(archivePath: string, outputDir: string) {
 
     // Wenn stderrData nicht leer ist, gab es kritische Fehler auf C-Ebene
     if (stderrData) {
-        console.error("Kritische Fehler beim Entpacken:", stderrData);
+        log.error("Kritische Fehler beim Entpacken: " + stderrData);
     }
     s.stop('Extraction completed!');
     return stdoutData;
@@ -242,7 +242,7 @@ export async function addNexusSupport(game: Game): Promise<void> {
 
     // Download Nexus
     const nexusArchivePath = await downloadFile(NEXUS_DOWNLOAD_URL, `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/vortex-setup-2.1.0-beta.5.exe`);
-    console.log("Nexus archive downloaded to:", nexusArchivePath);
+    log.message("Nexus archive downloaded to: " + nexusArchivePath);
 
 
 
@@ -255,9 +255,9 @@ export async function addNexusSupport(game: Game): Promise<void> {
     const protonPath = join(`${STEAM_PATH}`, 'steamapps/common/Proton - Experimental/proton');
     const protonDir = path.dirname(protonPath);
 
-    console.log("🚀 Starte Vortex Installation via Proton...");
-    console.log(`📦 Installer: ${VortexSetupExe}`);
-    console.log(`📂 Prefix: ${compatDataPath}`);
+    log.message("🚀 Starte Vortex Installation via Proton...");
+    log.message(`📦 Installer: ${VortexSetupExe}`);
+    log.message(`📂 Prefix: ${compatDataPath}`);
 
     // 2. Den Prozess mit Bun spawnen
     const proc = Bun.spawn({
@@ -282,9 +282,9 @@ export async function addNexusSupport(game: Game): Promise<void> {
     const exitCode = await proc.exited;
 
     if (exitCode === 0) {
-        console.log("✅ Installation erfolgreich beendet!");
+        log.message("✅ Installation erfolgreich beendet!");
     } else {
-        console.error(`❌ Installation abgebrochen oder fehlgeschlagen. Exit Code: ${exitCode}`);
+        log.error(`❌ Installation abgebrochen oder fehlgeschlagen. Exit Code: ${exitCode}`);
     }
 
     const nexusEntry = {
@@ -304,12 +304,21 @@ export async function addNexusSupport(game: Game): Promise<void> {
         tags: ["Tools", "Nexus Mods"]
     }
 
+    // Link game folder to proton's drive_c, so that vortex can find the game files
+    const gamePath = `${STEAM_PATH}/steamapps/common/${game.name}`;
+    const protonDriveC = `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/Program Files/${game.name}`;
+
+    if (!existsSync(protonDriveC)) {
+        log.info(`🔗 Erstelle symbolischen Link von "${gamePath}" zu "${protonDriveC}"`);
+        await symlink(gamePath, protonDriveC, 'junction');
+    } else {
+        log.info(`🔗 Symbolischer Link existiert bereits: "${protonDriveC}"`);
+    }
+
     const shortcutPath = `${STEAM_PATH}/userdata/${game.accountId}/config/shortcuts.vdf`;
 
     const buffer = readFileSync(shortcutPath);
     let shortcuts = parseBuffer(buffer);
     shortcuts.shortcuts.push(nexusEntry);
-    console.log("Current shortcuts:", shortcuts);
     writeFileSync(shortcutPath, writeBuffer(shortcuts));
-
 }

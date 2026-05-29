@@ -1,18 +1,17 @@
-import { select, confirm, isCancel, cancel, intro, outro } from "@clack/prompts";
+import { select, confirm, isCancel, cancel, intro, outro, log } from "@clack/prompts";
 import { getInstalledGames, getAccountId, isSteamInstalled, isSteamRunning, addNexusSupport } from "./steam-helper";
-import { info } from "console";
 
 async function main() {
     intro("Add Nexus Mods to your Steam proton games")
-    // if (!isSteamInstalled()) {
-    //     outro("Steam is not installed. Please install Steam and try again.")
-    //     process.exit(0)
-    // }
+    if (!isSteamInstalled()) {
+        outro("Steam is not installed. Please install Steam and try again.")
+        process.exit(0)
+    }
 
-    // if (isSteamRunning()) {
-    //     outro("Steam is running. Please close Steam and try again.")
-    //     process.exit(0)
-    // }
+    if (isSteamRunning()) {
+        outro("Steam is running. Please close Steam and try again.")
+        process.exit(0)
+    }
 
     const accountId = await getAccountId();
 
@@ -21,7 +20,7 @@ async function main() {
         process.exit(0)
     }
 
-    info("Scanning for installed games... for user " + accountId)
+    log.info("Scanning for installed games... for user " + accountId)
     const games = (await getInstalledGames(accountId)).filter(g => g.protonConfig.mode === "Proton");
     if (games.length === 0) {
         outro("No proton games found. Please install at least one game with proton and try again.")
@@ -47,10 +46,10 @@ async function main() {
     });
 
     if (isCancel(shouldProceed) || !shouldProceed) {
-        console.log('Operation cancelled');
+        log.warn('Operation cancelled');
         process.exit(0);
     } else {
-        console.log('Proceeding...');
+        log.message('Proceeding...');
         await addNexusSupport(selected);
     }
 
