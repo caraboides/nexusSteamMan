@@ -1,6 +1,6 @@
-# nexussteamman
+# Linux Steam Vortex Helper
 
-Adds Nexus Mods support to Steam Proton games on Linux.
+Adds Vortex support to Steam Proton games on Linux, to easy install nexus mod
 
 ## How it works
 

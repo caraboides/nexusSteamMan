@@ -233,6 +233,9 @@ export function generateSteamShortcutAppId(
     };
 }
 
+
+
+
 export async function addNexusSupport(game: Game): Promise<void> {
 
 
@@ -244,21 +247,53 @@ export async function addNexusSupport(game: Game): Promise<void> {
 
 
     // Create CompLayer symbolic link, for nexus entry to game compdata
-    const NexusClientExe = `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/vortex-setup-2.1.0-beta.5.exe`;
+    const VortexSetupExe = `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/vortex-setup-2.1.0-beta.5.exe`;
+    const VortexExe = `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/Program Files/Vortex/Vortex.exe`;
 
     const compatDataPath = `${STEAM_PATH}/steamapps/compatdata/${game.appId}`;
 
     const protonPath = join(`${STEAM_PATH}`, 'steamapps/common/Proton - Experimental/proton');
     const protonDir = path.dirname(protonPath);
 
+    console.log("🚀 Starte Vortex Installation via Proton...");
+    console.log(`📦 Installer: ${VortexSetupExe}`);
+    console.log(`📂 Prefix: ${compatDataPath}`);
+
+    // 2. Den Prozess mit Bun spawnen
+    const proc = Bun.spawn({
+        // Der Befehl: proton run setup.exe
+        cmd: [protonPath, "run", VortexSetupExe],
+
+        // 3. Zwingend erforderliche Umgebungsvariablen für Proton
+        env: {
+            ...process.env, // Behalte bestehende Variablen (wichtig für Display/X11/Wayland)
+            STEAM_COMPAT_CLIENT_INSTALL_PATH: STEAM_PATH,
+            STEAM_COMPAT_DATA_PATH: compatDataPath,
+            // Verhindert Grafikfehler im Installer (wie zuvor besprochen)
+            WINEDLLOVERRIDES: "vulkan-1=d",
+        },
+
+        // 4. Output direkt in die Bun-Konsole durchreichen
+        stdout: "inherit",
+        stderr: "inherit",
+    });
+
+    // 5. Auf Beendigung warten
+    const exitCode = await proc.exited;
+
+    if (exitCode === 0) {
+        console.log("✅ Installation erfolgreich beendet!");
+    } else {
+        console.error(`❌ Installation abgebrochen oder fehlgeschlagen. Exit Code: ${exitCode}`);
+    }
 
     const nexusEntry = {
-        appname: game.name + " Nexus Mod Manager",
+        appname: game.name + " Vortex Client",
         exe: `"${protonPath}"`,
         StartDir: `"${protonDir}"`,
         icon: "",
         // Hier passiert die Magie: Wir setzen den Prefix und die Ziel-EXE
-        LaunchOptions: `STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_PATH}" STEAM_COMPAT_DATA_PATH="${compatDataPath}" %command% run "${NexusClientExe}"`,
+        LaunchOptions: `STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_PATH}" STEAM_COMPAT_DATA_PATH="${compatDataPath}" WINEDLLOVERRIDES="vulkan-1=d" %command% run "${VortexExe}" --no-sandbox --disable-gpu`,
         IsHidden: 0,
         AllowDesktopConfig: 1,
         AllowOverlay: 1,
