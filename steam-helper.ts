@@ -1,6 +1,6 @@
 import os from "node:os";
 import { readFile } from "node:fs/promises";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import vdf from "vdf-parser";
 import path from "node:path";
 import type { Game, ProtonConfig } from "./model";
@@ -8,6 +8,7 @@ import { parseBuffer, parseFile, writeBuffer, writeFile } from 'steam-shortcut-e
 import { intro, outro, spinner, cancel } from '@clack/prompts';
 import { createWriteStream } from 'node:fs';
 import { join } from 'node:path';
+
 import { tmpdir } from 'node:os';
 import SevenZip from "7z-wasm";
 import { mkdir } from "node:fs/promises";
@@ -15,7 +16,7 @@ import { resolve, dirname, basename } from "node:path";
 import crc32 from 'crc-32';
 
 const STEAM_PATH = `${os.homedir()}/.steam/steam`;
-const NEXUS_DOWNLOAD_URL = "https://github.com/Nexus-Mods/Nexus-Mod-Manager/releases/download/0.88.4/NMM_0.88.4_Archive.7z";
+const NEXUS_DOWNLOAD_URL = "https://github.com/Nexus-Mods/Vortex/releases/download/v2.1.0-beta.5/vortex-setup-2.1.0-beta.5.exe";
 
 export function isSteamInstalled(): boolean {
     return existsSync(STEAM_PATH);
@@ -104,12 +105,10 @@ async function getGameName(appId: string, installDirs: string[]): Promise<string
     return appId;
 }
 
-async function downloadFile(url: string, fileName: string): Promise<string> {
+async function downloadFile(url: string, filePath: string): Promise<string> {
     intro(`Download-Manager gestartet`);
 
     const s = spinner();
-    const filePath = join(tmpdir(), fileName);
-
     try {
         const response = await fetch(url);
 
@@ -235,14 +234,31 @@ export function generateSteamShortcutAppId(
 }
 
 export async function addNexusSupport(game: Game): Promise<void> {
-    const shortcutPath = `${STEAM_PATH}/userdata/${game.accountId}/config/shortcuts.vdf`;
+
+
+
+    // Download Nexus
+    const nexusArchivePath = await downloadFile(NEXUS_DOWNLOAD_URL, `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/vortex-setup-2.1.0-beta.5.exe`);
+    console.log("Nexus archive downloaded to:", nexusArchivePath);
+
+
+
+    // Create CompLayer symbolic link, for nexus entry to game compdata
+    const NexusClientExe = `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/vortex-setup-2.1.0-beta.5.exe`;
+
+    const compatDataPath = `${STEAM_PATH}/steamapps/compatdata/${game.appId}`;
+
+    const protonPath = join(`${STEAM_PATH}`, 'steamapps/common/Proton - Experimental/proton');
+    const protonDir = path.dirname(protonPath);
+
+
     const nexusEntry = {
-        appid: generateSteamShortcutAppId("\"/path/to/vortex.exe\"", "Nexus Mod Manager for " + game.name).signed,
-        appname: "Nexus Mod Manager for " + game.name,
-        exe: "\"/path/to/vortex.exe\"",
-        StartDir: "\"/path/to/dir/\"",
+        appname: game.name + " Nexus Mod Manager",
+        exe: `"${protonPath}"`,
+        StartDir: `"${protonDir}"`,
         icon: "",
-        LaunchOptions: "LaunchOptions here",
+        // Hier passiert die Magie: Wir setzen den Prefix und die Ziel-EXE
+        LaunchOptions: `STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_PATH}" STEAM_COMPAT_DATA_PATH="${compatDataPath}" %command% run "${NexusClientExe}"`,
         IsHidden: 0,
         AllowDesktopConfig: 1,
         AllowOverlay: 1,
@@ -252,20 +268,13 @@ export async function addNexusSupport(game: Game): Promise<void> {
         LastPlayTime: 0,
         tags: ["Tools", "Nexus Mods"]
     }
+
+    const shortcutPath = `${STEAM_PATH}/userdata/${game.accountId}/config/shortcuts.vdf`;
+
     const buffer = readFileSync(shortcutPath);
     let shortcuts = parseBuffer(buffer);
-    console.log("Current shortcuts:", shortcuts);
     shortcuts.shortcuts.push(nexusEntry);
-    //writeFileSync(shortcutPath, writeBuffer(shortcuts));
-
-    // Download Nexus
-    const nexusArchivePath = await downloadFile(NEXUS_DOWNLOAD_URL, "nexus_mod_manager.7z");
-    console.log("Nexus archive downloaded to:", nexusArchivePath);
-
-    // Extract Nexus to game directory to ${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/Program Files/Nexus
-    await extractAndCapture(nexusArchivePath, `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/Program Files/Nexus`);
-
-
-    // Create CompLayer symbolic link, for nexus entry to game compdata
+    console.log("Current shortcuts:", shortcuts);
+    writeFileSync(shortcutPath, writeBuffer(shortcuts));
 
 }
