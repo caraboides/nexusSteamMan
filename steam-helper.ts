@@ -16,7 +16,7 @@ import { resolve, dirname, basename } from "node:path";
 import crc32 from 'crc-32';
 
 const STEAM_PATH = `${os.homedir()}/.steam/steam`;
-const NEXUS_DOWNLOAD_URL = "https://github.com/Nexus-Mods/Vortex/releases/download/v2.1.0-beta.5/vortex-setup-2.1.0-beta.5.exe";
+const NEXUS_DOWNLOAD_URL = "https://nexusmodsapp.nexusmods.com/NexusModsVortexSetup.exe";
 
 export function isSteamInstalled(): boolean {
     return existsSync(STEAM_PATH);
@@ -242,13 +242,13 @@ export async function addNexusSupport(game: Game): Promise<void> {
 
 
     // Download Nexus
-    const nexusArchivePath = await downloadFile(NEXUS_DOWNLOAD_URL, `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/vortex-setup-2.1.0-beta.5.exe`);
+    const nexusArchivePath = await downloadFile(NEXUS_DOWNLOAD_URL, `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/vortex-setup.exe`);
     log.message("Nexus archive downloaded to: " + nexusArchivePath);
 
 
 
     // Create CompLayer symbolic link, for nexus entry to game compdata
-    const VortexSetupExe = `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/vortex-setup-2.1.0-beta.5.exe`;
+    const VortexSetupExe = `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/vortex-setup.exe`;
     const VortexExe = `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/Program Files/Vortex/Vortex.exe`;
 
     const compatDataPath = `${STEAM_PATH}/steamapps/compatdata/${game.appId}`;
