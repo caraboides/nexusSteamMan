@@ -26,8 +26,10 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
 
+    "esModuleInterop": true,
     "types": [
-      "node"
+      "node",
+      "bun"
     ]
   }
 }

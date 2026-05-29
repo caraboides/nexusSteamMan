@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import SevenZip from "7z-wasm";
 import { mkdir } from "node:fs/promises";
 import { resolve, dirname, basename } from "node:path";
+import crc32 from 'crc-32';
 
 const STEAM_PATH = `${os.homedir()}/.steam/steam`;
 const NEXUS_DOWNLOAD_URL = "https://github.com/Nexus-Mods/Nexus-Mod-Manager/releases/download/0.88.4/NMM_0.88.4_Archive.7z";
@@ -203,9 +204,40 @@ async function extractAndCapture(archivePath: string, outputDir: string) {
     return stdoutData;
 }
 
+
+
+/**
+ * Berechnet die Steam appId für ein Non-Steam-Game
+ */
+export function generateSteamShortcutAppId(
+    exePath: string,
+    appName: string
+): {
+    unsigned: number;
+    signed: number;
+} {
+    // Steam verwendet: CRC32(exePath + appName)
+    const input = exePath + appName;
+
+    // CRC32 berechnen
+    const crc = crc32.str(input) >>> 0;
+
+    // Höchstes Bit setzen
+    const unsignedAppId = (crc | 0x80000000) >>> 0;
+
+    // Als signed int32 interpretieren
+    const signedAppId = unsignedAppId >> 0;
+
+    return {
+        unsigned: unsignedAppId,
+        signed: signedAppId,
+    };
+}
+
 export async function addNexusSupport(game: Game): Promise<void> {
     const shortcutPath = `${STEAM_PATH}/userdata/${game.accountId}/config/shortcuts.vdf`;
     const nexusEntry = {
+        appid: generateSteamShortcutAppId("\"/path/to/vortex.exe\"", "Nexus Mod Manager for " + game.name).signed,
         appname: "Nexus Mod Manager for " + game.name,
         exe: "\"/path/to/vortex.exe\"",
         StartDir: "\"/path/to/dir/\"",
