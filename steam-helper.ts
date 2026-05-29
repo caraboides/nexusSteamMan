@@ -53,11 +53,12 @@ export async function getInstalledGames(accountId: string): Promise<Game[]> {
 
     return Promise.all(installedAppIds.map(async id => {
         const p = await checkProton(id)
-        const name = await getGameName(id, installDirs)
+        const { name, path } = await getGameName(id, installDirs)
         return {
             appId: id,
             accountId,
             name,
+            installdir: path,
             protonConfig: p
         }
     }));
@@ -93,16 +94,16 @@ async function checkProton(appId: string): Promise<ProtonConfig> {
     return { appId, mode: "Native/Default" };
 }
 
-async function getGameName(appId: string, installDirs: string[]): Promise<string> {
+async function getGameName(appId: string, installDirs: string[]): Promise<{ name: string, path: string }> {
     for (const dir of installDirs) {
         const manifestPath = path.join(dir, "steamapps", `appmanifest_${appId}.acf`);
         if (existsSync(manifestPath)) {
             const content = await readFile(manifestPath, "utf-8");
             const data: any = vdf.parse(content);
-            return data.AppState?.name || appId;
+            return { name: data.AppState?.name || appId, path: data.AppState?.installdir || "" };
         }
     }
-    return appId;
+    return { name: appId, path: "" };
 }
 
 async function downloadFile(url: string, filePath: string): Promise<string> {
@@ -271,6 +272,8 @@ export async function addNexusSupport(game: Game): Promise<void> {
             STEAM_COMPAT_DATA_PATH: compatDataPath,
             // Verhindert Grafikfehler im Installer (wie zuvor besprochen)
             WINEDLLOVERRIDES: "vulkan-1=d",
+            STEAM_COMPAT_APP_ID: "0",
+            SteamAppId: "0"
         },
 
         // 4. Output direkt in die Bun-Konsole durchreichen
@@ -293,7 +296,7 @@ export async function addNexusSupport(game: Game): Promise<void> {
         StartDir: `"${protonDir}"`,
         icon: "",
         // Hier passiert die Magie: Wir setzen den Prefix und die Ziel-EXE
-        LaunchOptions: `STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_PATH}" STEAM_COMPAT_DATA_PATH="${compatDataPath}" WINEDLLOVERRIDES="vulkan-1=d" %command% run "${VortexExe}" --no-sandbox --disable-gpu`,
+        LaunchOptions: `STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_PATH}" STEAM_COMPAT_DATA_PATH="${compatDataPath}" STEAM_COMPAT_APP_ID=0 SteamAppId=0 WINEDLLOVERRIDES="vulkan-1=d" %command% run "${VortexExe}" /desktop=Vortex,1600x900 --no-sandbox --disable-gpu`,
         IsHidden: 0,
         AllowDesktopConfig: 1,
         AllowOverlay: 1,
@@ -305,8 +308,8 @@ export async function addNexusSupport(game: Game): Promise<void> {
     }
 
     // Link game folder to proton's drive_c, so that vortex can find the game files
-    const gamePath = `${STEAM_PATH}/steamapps/common/${game.name}`;
-    const protonDriveC = `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/Program Files/${game.name}`;
+    const gamePath = `${STEAM_PATH}/steamapps/common/${game.installdir}`;
+    const protonDriveC = `${STEAM_PATH}/steamapps/compatdata/${game.appId}/pfx/drive_c/Program Files/${game.installdir}`;
 
     if (!existsSync(protonDriveC)) {
         log.info(`🔗 Erstelle symbolischen Link von "${gamePath}" zu "${protonDriveC}"`);
