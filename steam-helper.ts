@@ -296,7 +296,7 @@ export async function addNexusSupport(game: Game): Promise<void> {
         StartDir: `"${protonDir}"`,
         icon: "",
         // Hier passiert die Magie: Wir setzen den Prefix und die Ziel-EXE
-        LaunchOptions: `STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_PATH}" STEAM_COMPAT_DATA_PATH="${compatDataPath}" STEAM_COMPAT_APP_ID=0 SteamAppId=0 WINEDLLOVERRIDES="vulkan-1=d" %command% run "${VortexExe}" /desktop=Vortex,1600x900 --no-sandbox --disable-gpu`,
+        LaunchOptions: `STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_PATH}" STEAM_COMPAT_DATA_PATH="${compatDataPath}" WINEDLLOVERRIDES="vulkan-1=d" %command% run "${VortexExe}" /desktop=Vortex,1600x900 --no-sandbox --disable-gpu`,
         IsHidden: 0,
         AllowDesktopConfig: 1,
         AllowOverlay: 1,
